@@ -157,7 +157,7 @@ async function main() {
         return; // Exit if connection fails
     }
 
-    // Create a RedisStore instance for managing WhatsApp session data
+    // Create a RedisStore instance for managing Baileys store data
     const store = new RedisStore({
         redisConnection: redisClient,
         prefix: 'store', // Optional prefix for Redis keys
