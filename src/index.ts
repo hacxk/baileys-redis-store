@@ -191,7 +191,7 @@ export class RedisStore {
         const pipeline = this.client.multi();
         for (const update of updates) {
             if (update.id) {
-                pipeline.hSet(this.key('groups', update.id), update as unknown as Record<string, string>);
+                pipeline.set(this.key('groups', update.id), JSON.stringify(update));
             }
         }
         await pipeline.exec();
