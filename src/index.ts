@@ -1,6 +1,6 @@
 import { RedisClientType } from 'redis';
-import { proto, WAMessageKey, BaileysEventMap, Chat, Contact, ConnectionState, GroupMetadata, PresenceData, WAMessage, WAMessageContent } from '@whiskeysockets/baileys';
-import { jidNormalizedUser, updateMessageWithReaction, updateMessageWithReceipt } from '@whiskeysockets/baileys';
+import { proto, WAMessageKey, BaileysEventMap, Chat, Contact, ConnectionState, GroupMetadata, PresenceData, WAMessage, WAMessageContent } from 'baileys';
+import { jidNormalizedUser, updateMessageWithReaction, updateMessageWithReceipt } from 'baileys';
 import pino from 'pino';
 import { EventEmitter } from 'events';
 
@@ -134,7 +134,7 @@ export class RedisStore {
             Object.entries(update).map(([key, value]) => [key, value !== undefined ? String(value) : 'null'])
         );
 
-        await this.client.hSet(this.key('state', 'connection'), stringifiedUpdate);
+        await this.client.set(this.key('state', 'connection'), JSON.stringify(stringifiedUpdate));
 
         this.logger.debug({ update: stringifiedUpdate }, 'Connection state updated');
     }
@@ -143,7 +143,7 @@ export class RedisStore {
     private async handleChatsUpsert(newChats: Chat[]): Promise<void> {
         const pipeline = this.client.multi();
         for (const chat of newChats) {
-            pipeline.hSet(this.key('chats', chat.id), chat as unknown as Record<string, string>);
+            pipeline.set(this.key('chats', chat.id), JSON.stringify(chat));
         }
         await pipeline.exec();
         this.logger.debug({ chatCount: newChats.length }, 'Chats upserted');
@@ -152,7 +152,7 @@ export class RedisStore {
     private async handleContactsUpsert(newContacts: Contact[]): Promise<void> {
         const pipeline = this.client.multi();
         for (const contact of newContacts) {
-            pipeline.hSet(this.key('contacts', contact.id), contact as unknown as Record<string, string>);
+            pipeline.set(this.key('contacts', contact.id), JSON.stringify(contact));
         }
         await pipeline.exec();
         this.logger.debug({ contactCount: newContacts.length }, 'Contacts upserted');
@@ -166,7 +166,7 @@ export class RedisStore {
             pipeline.set(messageKey, JSON.stringify(msg));
             pipeline.zAdd(this.key('message_list', jid), { score: Number(msg.messageTimestamp), value: msg.key.id! });
             pipeline.sAdd(this.key('message_global_list'), `${jid}:${msg.key.id}`);
-
+            
             this.updateMessageCache(msg);
 
             if (type === 'notify') {
@@ -182,7 +182,7 @@ export class RedisStore {
         const key = `${msg.key.remoteJid}:${msg.key.id}`;
         this.messageCache.set(key, msg);
         if (this.messageCache.size > this.maxCacheSize) {
-            const oldestKey = this.messageCache.keys().next().value;
+            const oldestKey: string = this.messageCache.keys().next().value;
             this.messageCache.delete(oldestKey);
         }
     }
@@ -233,7 +233,7 @@ export class RedisStore {
     }
 
     private async handlePresenceUpdate({ id, presences }: { id: string, presences: { [participant: string]: PresenceData } }): Promise<void> {
-        await this.client.hSet(this.key('presences', id), presences as unknown as Record<string, string>);
+        await this.client.set(this.key('presences', id), JSON.stringify(presences));
         this.logger.debug({ id, presenceCount: Object.keys(presences).length }, 'Presence updated');
     }
 
@@ -437,17 +437,3 @@ export class RedisStore {
         this.logger.info('All data cleared from Redis and local cache');
     }
 }
-
-// // Usage example
-// async function example(): Promise<void> {
-//     const store = new AdvancedRedisStore({
-//         redisUrl: 'redis://localhost:6379',
-//         prefix: 'myapp:baileys:',
-//         logger: pino({ level: 'debug' }),
-//         maxCacheSize: 5000
-//     });
-
-//     await store.connect();
-
-// // Bind to Baileys events
-// // const sock = makeWASocket({
